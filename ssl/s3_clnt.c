@@ -3417,6 +3417,12 @@ int ssl3_check_cert_and_algorithm(SSL *s)
 #endif
 #endif
 
+	if (rsa != NULL) {
+        if (BN_num_bits(s->session->sess_cert->peer_key->x509->cert_info->key->pkey->pkey.rsa->n) > BN_num_bits(rsa->n)) {
+            abort();
+        }
+	}
+
 	if (SSL_C_IS_EXPORT(s->s3->tmp.new_cipher) && !has_bits(i,EVP_PKT_EXP))
 		{
 #ifndef OPENSSL_NO_RSA
