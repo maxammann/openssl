@@ -5644,3 +5644,21 @@ void SSL_set_allow_early_data_cb(SSL *s,
     s->allow_early_data_cb = cb;
     s->allow_early_data_cb_data = arg;
 }
+
+
+#include "claim-interface.h"
+
+Claim current_claim(const void *tls_like) {
+    SSL* ssl = ((SSL*) tls_like);
+    struct EVP_PKEY* key = X509_get_pubkey(SSL_get_certificate(ssl));
+
+    int ret = 2;
+    if (key != NULL) {
+        struct rsa_st* rsa = EVP_PKEY_get0_RSA(key);
+        ret = RSA_bits(rsa);
+    }
+
+    struct Claim new;
+    new.used_rsa_key_length = ret;
+    return new;
+}
