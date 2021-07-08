@@ -5647,18 +5647,20 @@ void SSL_set_allow_early_data_cb(SSL *s,
 
 
 #include "claim-interface.h"
+#include <openssl/rsa.h>
 
 Claim current_claim(const void *tls_like) {
     SSL* ssl = ((SSL*) tls_like);
-    struct EVP_PKEY* key = X509_get_pubkey(SSL_get_certificate(ssl));
+    struct Claim new = { -1 };
 
-    int ret = 2;
+    struct EVP_PKEY* key = X509_get_pubkey(SSL_get_certificate(ssl));
     if (key != NULL) {
         struct rsa_st* rsa = EVP_PKEY_get0_RSA(key);
-        ret = RSA_bits(rsa);
+        new.cert_rsa_key_length = RSA_bits(rsa);
     }
 
-    struct Claim new;
-    new.used_rsa_key_length = ret;
+    memcpy(new.master_secret, ssl->master_secret, sizeof(unsigned char) * 64);
+    new.state = SSL_get_state(ssl);
+
     return new;
 }
