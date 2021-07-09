@@ -5647,9 +5647,8 @@ void SSL_set_allow_early_data_cb(SSL *s,
 
 
 #include "claim-interface.h"
-#include <openssl/rsa.h>
 
-Claim current_claim(const void *tls_like) {
+/*Claim current_claim(const void *tls_like) {
     SSL* ssl = ((SSL*) tls_like);
     struct Claim new = { -1 };
 
@@ -5663,4 +5662,18 @@ Claim current_claim(const void *tls_like) {
     new.state = SSL_get_state(ssl);
 
     return new;
+}*/
+
+void register_claimer(const void *tls_like, void (* claim)(Claim claim, void* ctx), void* claim_ctx) {
+    SSL* ssl = ((SSL*) tls_like);
+
+    ssl->claim = claim;
+    ssl->claim_ctx = claim_ctx;
+}
+
+void* deregister_claimer(const void *tls_like){
+    SSL* ssl = ((SSL*) tls_like);
+
+    ssl->claim = 0;
+    ssl->claim_ctx = 0;
 }
