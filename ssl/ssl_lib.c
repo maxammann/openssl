@@ -5686,8 +5686,28 @@ void fill_claim(SSL *s, Claim* claim) {
     // master_secret
     memcpy(claim->master_secret, s->master_secret, sizeof(unsigned char) * 64);
 
+    // chosen cipher
     const SSL_CIPHER *new_cipher = s->s3->tmp.new_cipher;
     if (new_cipher != 0) {
         claim->chosen_cipher = new_cipher->id;
+        claim->cipher_bits = SSL_CIPHER_get_bits(new_cipher, 0);
+    }
+
+    // DH peer_tmp
+    const EVP_PKEY *peer_key = s->s3->peer_tmp;
+    if (peer_key != 0) {
+        claim->peer_tmp_security_bits = EVP_PKEY_security_bits(peer_key);
+/*        switch (EVP_PKEY_id(peer_key)) {
+            default:
+                break;
+            case EVP_PKEY_RSA:
+                break;
+            case EVP_PKEY_DH:
+                claim->peer_tmp_len_dh = DH_size(EVP_PKEY_get0_DH(peer_key));
+                break;
+            case EVP_PKEY_EC:
+                claim->peer_tmp_len_ec = EC_GROUP_order_bits(EC_KEY_get0_group(EVP_PKEY_get0_EC_KEY(peer_key)));
+                break;
+        }*/
     }
 }

@@ -2470,14 +2470,6 @@ int tls_construct_server_hello(SSL *s, WPACKET *pkt)
         /* SSLfatal() already called */;
         return 0;
     }
-
-    Claim claim = { 0 };
-    claim.typ = CLAIM_SERVER_HELLO;
-
-    fill_claim(s, &claim);
-
-    s->claim(claim, s->claim_ctx);
-
     return 1;
 }
 
