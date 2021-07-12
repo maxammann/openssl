@@ -5648,22 +5648,6 @@ void SSL_set_allow_early_data_cb(SSL *s,
 
 #include "claim-interface.h"
 
-/*Claim current_claim(const void *tls_like) {
-    SSL* ssl = ((SSL*) tls_like);
-    struct Claim new = { -1 };
-
-    struct EVP_PKEY* key = X509_get_pubkey(SSL_get_certificate(ssl));
-    if (key != NULL) {
-        struct rsa_st* rsa = EVP_PKEY_get0_RSA(key);
-        new.cert_rsa_key_length = RSA_bits(rsa);
-    }
-
-    memcpy(new.master_secret, ssl->master_secret, sizeof(unsigned char) * 64);
-    new.state = SSL_get_state(ssl);
-
-    return new;
-}*/
-
 void register_claimer(const void *tls_like, void (* claim)(Claim claim, void* ctx), void* claim_ctx) {
     SSL* ssl = ((SSL*) tls_like);
 
@@ -5676,4 +5660,26 @@ void* deregister_claimer(const void *tls_like){
 
     ssl->claim = 0;
     ssl->claim_ctx = 0;
+}
+
+void fill_claim(SSL *s, Claim* claim) {
+    // ciphers
+    STACK_OF(SSL_CIPHER) * ciphers = SSL_get_ciphers(s);
+    int available_ciphers_len = sk_SSL_CIPHER_num(ciphers);
+    claim->available_ciphers_len = available_ciphers_len;
+    for (int j = 0; j < available_ciphers_len; ++j) {
+        const SSL_CIPHER *c = sk_SSL_CIPHER_value(ciphers, j);
+        if (j < CLAIM_MAX_AVAILABLE_CIPHERS) {
+            claim->available_ciphers[j] = c->id & 0xffff;
+        }
+    }
+
+    // cert_rsa_key_length
+    EVP_PKEY* key = X509_get_pubkey(SSL_get_certificate(s));
+    if (key != NULL) {
+        claim->cert_rsa_key_length = RSA_bits(EVP_PKEY_get0_RSA(key));
+    }
+
+    // master_secret
+    memcpy(claim->master_secret, s->master_secret, sizeof(unsigned char) * 64);
 }

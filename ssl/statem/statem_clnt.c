@@ -1244,21 +1244,12 @@ int tls_construct_client_hello(SSL *s, WPACKET *pkt)
         return 0;
     }
 
-    struct Claim new = { -1 };
-    new.typ = CLAIM_CLIENT_CIPHERS;
-    STACK_OF(SSL_CIPHER) * ciphers = SSL_get_ciphers(s);
+    Claim claim = { 0 };
+    claim.typ = CLAIM_CIPHERS;
 
-    for (int j = 0; j < sk_SSL_CIPHER_num(ciphers); ++j) {
-        const SSL_CIPHER *c;
-
-        c = sk_SSL_CIPHER_value(ciphers, j);
-
-        if (j < 64) {
-            new.available_ciphers[j] = c->id & 0xffff;
-        }
-    }
+    fill_claim(s, &claim);
     
-    s->claim(new, s->claim_ctx);
+    s->claim(claim, s->claim_ctx);
 
     if (!ssl_cipher_list_to_bytes(s, SSL_get_ciphers(s), pkt)) {
         /* SSLfatal() already called */
