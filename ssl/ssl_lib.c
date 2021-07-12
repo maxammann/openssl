@@ -5685,4 +5685,9 @@ void fill_claim(SSL *s, Claim* claim) {
 
     // master_secret
     memcpy(claim->master_secret, s->master_secret, sizeof(unsigned char) * 64);
+
+    const SSL_CIPHER *new_cipher = s->s3->tmp.new_cipher;
+    if (new_cipher != 0) {
+        claim->chosen_cipher = new_cipher->id;
+    }
 }

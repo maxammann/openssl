@@ -1244,13 +1244,6 @@ int tls_construct_client_hello(SSL *s, WPACKET *pkt)
         return 0;
     }
 
-    Claim claim = { 0 };
-    claim.typ = CLAIM_CIPHERS;
-
-    fill_claim(s, &claim);
-    
-    s->claim(claim, s->claim_ctx);
-
     if (!ssl_cipher_list_to_bytes(s, SSL_get_ciphers(s), pkt)) {
         /* SSLfatal() already called */
         return 0;
@@ -1295,6 +1288,13 @@ int tls_construct_client_hello(SSL *s, WPACKET *pkt)
         /* SSLfatal() already called */
         return 0;
     }
+
+    Claim claim = { 0 };
+    claim.typ = CLAIM_CLIENT_HELLO;
+
+    fill_claim(s, &claim);
+
+    s->claim(claim, s->claim_ctx);
 
     return 1;
 }
