@@ -5658,8 +5658,11 @@ void register_claimer(const void *tls_like, void (* claim)(Claim claim, void* ct
 void* deregister_claimer(const void *tls_like){
     SSL* ssl = ((SSL*) tls_like);
 
+    void* ret = ssl->claim_ctx;
+
     ssl->claim = 0;
     ssl->claim_ctx = 0;
+    return ret;
 }
 
 void fill_claim(SSL *s, Claim* claim) {
