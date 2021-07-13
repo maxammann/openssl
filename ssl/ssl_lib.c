@@ -5665,50 +5665,73 @@ void* deregister_claimer(const void *tls_like){
     return ret;
 }
 
+ClaimKeyType match_key_type(const EVP_PKEY *key) {
+    switch (EVP_PKEY_base_id(key)) {
+        default:
+            return CLAIM_KEY_TYPE_UNKNOWN;
+        case EVP_PKEY_RSA:
+            return CLAIM_KEY_TYPE_RSA;
+        case EVP_PKEY_DH:
+            return CLAIM_KEY_TYPE_DH;
+        case EVP_PKEY_EC:
+        case EVP_PKEY_POLY1305:
+        case EVP_PKEY_SIPHASH:
+        case EVP_PKEY_X25519:
+        case EVP_PKEY_ED25519:
+        case EVP_PKEY_X448:
+        case EVP_PKEY_ED448:
+            return CLAIM_KEY_TYPE_EC;
+        case EVP_PKEY_DSA:
+            return CLAIM_KEY_TYPE_DSA;
+    }
+}
+
 void fill_claim(SSL *s, Claim* claim) {
     // ciphers
+    ClaimCiphers claim_ciphers = { 0 };
     STACK_OF(SSL_CIPHER) * ciphers = SSL_get_ciphers(s);
     int available_ciphers_len = sk_SSL_CIPHER_num(ciphers);
-    claim->available_ciphers_len = available_ciphers_len;
+    claim_ciphers.len = available_ciphers_len;
     for (int j = 0; j < available_ciphers_len; ++j) {
         const SSL_CIPHER *c = sk_SSL_CIPHER_value(ciphers, j);
         if (j < CLAIM_MAX_AVAILABLE_CIPHERS) {
-            claim->available_ciphers[j] = c->id & 0xffff;
+            claim_ciphers.ciphers[j] = c->id & 0xffff;
         }
     }
+    claim->available_ciphers = claim_ciphers;
 
     // cert_rsa_key_length
-    EVP_PKEY* key = X509_get_pubkey(SSL_get_certificate(s));
+    const EVP_PKEY* key = X509_get_pubkey(SSL_get_certificate(s));
     if (key != NULL) {
-        claim->cert_rsa_key_length = RSA_bits(EVP_PKEY_get0_RSA(key)); // todo remove this or next line
-        claim->cert_key_length = EVP_PKEY_bits(key);
+        claim->server_cert_key_type = match_key_type(key);
+        claim->server_cert_key_length = EVP_PKEY_bits(key);
+        /*specific for RSA: claim->cert_rsa_key_length = RSA_bits(EVP_PKEY_get0_RSA(key));*/
     }
 
-    // master_secret
-    memcpy(claim->master_secret, s->master_secret, sizeof(unsigned char) * 64);
+    // tls 1.3 secrets
+    memcpy(claim->early_secret.secret, s->early_secret, EVP_MAX_MD_SIZE);
+    memcpy(claim->handshake_secret.secret, s->handshake_secret, EVP_MAX_MD_SIZE);
+    memcpy(claim->master_secret.secret, s->master_secret, EVP_MAX_MD_SIZE);
+    memcpy(claim->resumption_master_secret.secret, s->resumption_master_secret, EVP_MAX_MD_SIZE);
+    memcpy(claim->client_finished_secret.secret, s->client_finished_secret, EVP_MAX_MD_SIZE);
+    memcpy(claim->server_finished_secret.secret, s->server_finished_secret, EVP_MAX_MD_SIZE);
+    memcpy(claim->server_finished_hash.secret, s->server_finished_hash, EVP_MAX_MD_SIZE);
+    memcpy(claim->handshake_traffic_hash.secret, s->handshake_traffic_hash, EVP_MAX_MD_SIZE);
+    memcpy(claim->client_app_traffic_secret.secret, s->client_app_traffic_secret, EVP_MAX_MD_SIZE);
+    memcpy(claim->server_app_traffic_secret.secret, s->server_app_traffic_secret, EVP_MAX_MD_SIZE);
+    memcpy(claim->exporter_master_secret.secret, s->exporter_master_secret, EVP_MAX_MD_SIZE);
+    memcpy(claim->early_exporter_master_secret.secret, s->early_exporter_master_secret, EVP_MAX_MD_SIZE);
 
     // chosen cipher
     const SSL_CIPHER *new_cipher = s->s3->tmp.new_cipher;
     if (new_cipher != 0) {
         claim->chosen_cipher = new_cipher->id;
-        claim->cipher_bits = SSL_CIPHER_get_bits(new_cipher, 0);
     }
 
-    // DH peer_tmp
+    // temporary/ephemeral key peer_tmp
     const EVP_PKEY *peer_key = s->s3->peer_tmp;
     if (peer_key != 0) {
+        claim->peer_tmp_type = match_key_type(peer_key);
         claim->peer_tmp_security_bits = EVP_PKEY_security_bits(peer_key);
-/*        switch (EVP_PKEY_id(peer_key)) {
-            default:
-                break;
-            case EVP_PKEY_RSA:
-                break;
-            case EVP_PKEY_DH:
-                claim->peer_tmp_len_dh = DH_size(EVP_PKEY_get0_DH(peer_key));
-                break;
-            case EVP_PKEY_EC:
-                claim->peer_tmp_len_ec = EC_GROUP_order_bits(EC_KEY_get0_group(EVP_PKEY_get0_EC_KEY(peer_key)));
-                break;
-        }*/
     }
 }
