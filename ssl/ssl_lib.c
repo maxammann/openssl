@@ -5674,19 +5674,27 @@ ClaimKeyType match_key_type(const EVP_PKEY *key) {
         case EVP_PKEY_DH:
             return CLAIM_KEY_TYPE_DH;
         case EVP_PKEY_EC:
-        case EVP_PKEY_POLY1305:
-        case EVP_PKEY_SIPHASH:
-        case EVP_PKEY_X25519:
-        case EVP_PKEY_ED25519:
-        case EVP_PKEY_X448:
-        case EVP_PKEY_ED448:
             return CLAIM_KEY_TYPE_EC;
+        case EVP_PKEY_POLY1305:
+            return CLAIM_KEY_TYPE_POLY1305;
+        case EVP_PKEY_SIPHASH:
+            return CLAIM_KEY_TYPE_SIPHASH;
+        case EVP_PKEY_X25519:
+            return CLAIM_KEY_TYPE_X25519;
+        case EVP_PKEY_ED25519:
+            return CLAIM_KEY_TYPE_ED25519;
+        case EVP_PKEY_X448:
+            return CLAIM_KEY_TYPE_X448;
+        case EVP_PKEY_ED448:
+            return CLAIM_KEY_TYPE_ED448;
         case EVP_PKEY_DSA:
             return CLAIM_KEY_TYPE_DSA;
     }
 }
 
 void fill_claim(SSL *s, Claim* claim) {
+    claim->version = s->version;
+
     // ciphers
     ClaimCiphers claim_ciphers = { 0 };
     STACK_OF(SSL_CIPHER) * ciphers = SSL_get_ciphers(s);
@@ -5740,5 +5748,19 @@ void fill_claim(SSL *s, Claim* claim) {
     if (peer_key != 0) {
         claim->peer_tmp_type = match_key_type(peer_key);
         claim->peer_tmp_security_bits = EVP_PKEY_security_bits(peer_key);
+    }
+
+    // todo not working yet, as tmp is shortlived
+    const EVP_PKEY *key_share_key = s->s3->tmp.pkey;
+    if (key_share_key != 0) {
+        claim->key_share_type = match_key_type(key_share_key);
+    }
+    int group_id = s->s3->group_id;
+    claim->group_id = group_id;
+
+    // transcript
+    if (s->s3->handshake_dgst != 0) {
+        size_t hashlen = 0;
+        ssl_handshake_hash(s, claim->transcript, EVP_MAX_MD_SIZE, &hashlen);
     }
 }
