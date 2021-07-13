@@ -5680,7 +5680,8 @@ void fill_claim(SSL *s, Claim* claim) {
     // cert_rsa_key_length
     EVP_PKEY* key = X509_get_pubkey(SSL_get_certificate(s));
     if (key != NULL) {
-        claim->cert_rsa_key_length = RSA_bits(EVP_PKEY_get0_RSA(key));
+        claim->cert_rsa_key_length = RSA_bits(EVP_PKEY_get0_RSA(key)); // todo remove this or next line
+        claim->cert_key_length = EVP_PKEY_bits(key);
     }
 
     // master_secret
