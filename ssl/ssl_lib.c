@@ -5700,12 +5700,19 @@ void fill_claim(SSL *s, Claim* claim) {
     }
     claim->available_ciphers = claim_ciphers;
 
-    // cert_rsa_key_length
-    const EVP_PKEY* key = X509_get_pubkey(SSL_get_certificate(s));
-    if (key != NULL) {
-        claim->server_cert_key_type = match_key_type(key);
-        claim->server_cert_key_length = EVP_PKEY_bits(key);
-        /*specific for RSA: claim->cert_rsa_key_length = RSA_bits(EVP_PKEY_get0_RSA(key));*/
+    // cert
+    const EVP_PKEY* cert_key = X509_get_pubkey(SSL_get_certificate(s));
+    if (cert_key != NULL) {
+        claim->cert.key_type = match_key_type(cert_key);
+        claim->cert.key_length = EVP_PKEY_bits(cert_key);
+        /*specific for RSA: RSA_bits(EVP_PKEY_get0_RSA(cert_key));*/
+    }
+
+    // peer cert
+    const EVP_PKEY* peer_cert_key = X509_get_pubkey(SSL_get_peer_certificate(s));
+    if (peer_cert_key != NULL) {
+        claim->peer_cert.key_type = match_key_type(peer_cert_key);
+        claim->peer_cert.key_length = EVP_PKEY_bits(peer_cert_key);
     }
 
     // tls 1.3 secrets
