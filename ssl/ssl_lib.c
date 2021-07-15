@@ -5695,7 +5695,7 @@ ClaimKeyType match_key_type(const EVP_PKEY *key) {
 void fill_claim(SSL *s, Claim* claim) {
     claim->version.data = s->version;
 
-    if (s->session == 0 || s-> version == TLS1_3_VERSION) {
+    if (s->session == 0 || s->version == TLS1_3_VERSION) {
         // fallback for TLS 1.3, as session_id is not filled until the handshake is done
         memcpy(claim->session_id.data, s->tmp_session_id, s->tmp_session_id_len);
     } else {
@@ -5745,6 +5745,11 @@ void fill_claim(SSL *s, Claim* claim) {
     memcpy(claim->server_app_traffic_secret.secret, s->server_app_traffic_secret, EVP_MAX_MD_SIZE);
     memcpy(claim->exporter_master_secret.secret, s->exporter_master_secret, EVP_MAX_MD_SIZE);
     memcpy(claim->early_exporter_master_secret.secret, s->early_exporter_master_secret, EVP_MAX_MD_SIZE);
+
+    // 1.2 secret
+    if (s->session != 0 && s->version == TLS1_2_VERSION) {
+        memcpy(claim->master_secret_12.secret, s->session->master_key, s->session->master_key_length);
+    }
 
     // chosen cipher
     const SSL_CIPHER *new_cipher = s->s3->tmp.new_cipher;
