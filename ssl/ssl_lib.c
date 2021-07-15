@@ -5695,6 +5695,8 @@ ClaimKeyType match_key_type(const EVP_PKEY *key) {
 void fill_claim(SSL *s, Claim* claim) {
     claim->version.data = s->version;
 
+    claim->server = s->server;
+
     if (s->session == 0 || s->version == TLS1_3_VERSION) {
         // fallback for TLS 1.3, as session_id is not filled until the handshake is done
         memcpy(claim->session_id.data, s->tmp_session_id, s->tmp_session_id_len);
