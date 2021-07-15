@@ -3286,7 +3286,7 @@ static int tls_process_cke_ecdhe(SSL *s, PACKET *pkt)
     }
 
     ret = 1;
-    EVP_PKEY_free(s->s3->tmp.pkey);
+    EVP_PKEY_free(s->s3->tmp.pkey); // todo openssl is clearing it for TLS 1.2, we maybe want to keep it until end of handshake?
     s->s3->tmp.pkey = NULL;
  err:
     EVP_PKEY_free(ckey);

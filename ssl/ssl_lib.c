@@ -5693,7 +5693,16 @@ ClaimKeyType match_key_type(const EVP_PKEY *key) {
 }
 
 void fill_claim(SSL *s, Claim* claim) {
-    claim->version = s->version;
+    claim->version.data = s->version;
+
+    if (s->session == 0 || s-> version == TLS1_3_VERSION) {
+        // fallback for TLS 1.3, as session_id is not filled until the handshake is done
+        memcpy(claim->session_id.data, s->tmp_session_id, s->tmp_session_id_len);
+    } else {
+        memcpy(claim->session_id.data, s->session->session_id, 32);
+    }
+    memcpy(claim->client_random.data, s->s3->client_random, 32);
+    memcpy(claim->server_random.data, s->s3->server_random, 32);
 
     // ciphers
     ClaimCiphers claim_ciphers = { 0 };
@@ -5703,7 +5712,7 @@ void fill_claim(SSL *s, Claim* claim) {
     for (int j = 0; j < available_ciphers_len; ++j) {
         const SSL_CIPHER *c = sk_SSL_CIPHER_value(ciphers, j);
         if (j < CLAIM_MAX_AVAILABLE_CIPHERS) {
-            claim_ciphers.ciphers[j] = c->id & 0xffff;
+            claim_ciphers.ciphers[j].data = c->id & 0xffff;
         }
     }
     claim->available_ciphers = claim_ciphers;
@@ -5740,27 +5749,28 @@ void fill_claim(SSL *s, Claim* claim) {
     // chosen cipher
     const SSL_CIPHER *new_cipher = s->s3->tmp.new_cipher;
     if (new_cipher != 0) {
-        claim->chosen_cipher = new_cipher->id;
+        claim->chosen_cipher.data = new_cipher->id;
     }
 
-    // temporary/ephemeral key peer_tmp
-    const EVP_PKEY *peer_key = s->s3->peer_tmp;
-    if (peer_key != 0) {
-        claim->peer_tmp_type = match_key_type(peer_key);
-        claim->peer_tmp_security_bits = EVP_PKEY_security_bits(peer_key);
+    // temporary/ephemeral peer key
+    const EVP_PKEY *peer_tmp_skey = s->s3->peer_tmp; // same as: SSL_get_peer_tmp_key
+    if (peer_tmp_skey != 0) {
+        claim->peer_tmp_skey_type = match_key_type(peer_tmp_skey);
+        claim->peer_tmp_skey_security_bits = EVP_PKEY_security_bits(peer_tmp_skey);
     }
 
-    // todo not working yet, as tmp is shortlived
-    const EVP_PKEY *key_share_key = s->s3->tmp.pkey;
-    if (key_share_key != 0) {
-        claim->key_share_type = match_key_type(key_share_key);
+    // temporary/ephemeral peer key
+    // todo this is cleared on TLS 1.2 after the receiving a ClientKeyExchange on the server -> tmp is shortlived
+    const EVP_PKEY *tmp_skey = s->s3->tmp.pkey; // same as: SSL_get_tmp_key
+    if (tmp_skey != 0) {
+        claim->tmp_skey_type = match_key_type(tmp_skey);
     }
-    int group_id = s->s3->group_id;
-    claim->group_id = group_id;
+    // Group ID of s->s3->tmp.pkey
+    claim->tmp_skey_group_id = s->s3->group_id;
 
     // transcript
     if (s->s3->handshake_dgst != 0) {
         size_t hashlen = 0;
-        ssl_handshake_hash(s, claim->transcript, EVP_MAX_MD_SIZE, &hashlen);
+        ssl_handshake_hash(s, claim->transcript.data, EVP_MAX_MD_SIZE, &hashlen);
     }
 }
