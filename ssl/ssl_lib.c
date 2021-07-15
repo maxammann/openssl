@@ -5757,6 +5757,16 @@ void fill_claim(SSL *s, Claim* claim) {
         claim->chosen_cipher.data = new_cipher->id;
     }
 
+    // signature algorithm
+    const SIGALG_LOOKUP *lu = s->s3->tmp.sigalg; /* Signature algorithm openssl actually uses */
+    if (lu != 0) {
+        claim->signature_algorithm = lu->sig;
+    }
+    const SIGALG_LOOKUP *peer_lu = s->s3->tmp.peer_sigalg; /* Signature algorithm openssl actually uses */
+    if (peer_lu != 0) {
+        claim->peer_signature_algorithm = peer_lu->sig;
+    }
+
     // temporary/ephemeral peer key
     const EVP_PKEY *peer_tmp_skey = s->s3->peer_tmp; // same as: SSL_get_peer_tmp_key
     if (peer_tmp_skey != 0) {
@@ -5770,8 +5780,13 @@ void fill_claim(SSL *s, Claim* claim) {
     if (tmp_skey != 0) {
         claim->tmp_skey_type = match_key_type(tmp_skey);
     }
-    // Group ID of s->s3->tmp.pkey
+    // TLS 1.3: Group ID of s->s3->tmp.pkey
     claim->tmp_skey_group_id = s->s3->group_id;
+/*    const TLS_GROUP_INFO *cinf = tls1_group_id_lookup(s->s3->group_id);
+    if (cinf != 0) {
+        const char *name = OBJ_nid2sn(cinf->nid);
+        printf("%s\n", name);
+    }*/
 
     // transcript
     if (s->s3->handshake_dgst != 0) {
