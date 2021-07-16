@@ -5692,6 +5692,34 @@ ClaimKeyType match_key_type(const EVP_PKEY *key) {
     }
 }
 
+int create_handshake_hash(SSL *s, unsigned char *out, size_t outlen, size_t *hashlen) {
+    EVP_MD_CTX * ctx = NULL;
+    EVP_MD_CTX * hdgst = s->s3->handshake_dgst;
+    int hashleni = EVP_MD_CTX_size(hdgst);
+    int ret = 0;
+
+    if (hashleni < 0 || (size_t)hashleni > outlen) {
+        goto err;
+    }
+
+    ctx = EVP_MD_CTX_new();
+    if (ctx == NULL) {
+        goto err;
+    }
+
+    if (!EVP_MD_CTX_copy_ex(ctx, hdgst)
+        || EVP_DigestFinal_ex(ctx, out, NULL) <= 0) {
+        goto err;
+    }
+
+    *hashlen = hashleni;
+
+    ret = 1;
+    err:
+    EVP_MD_CTX_free(ctx);
+    return ret;
+}
+
 void fill_claim(SSL *s, Claim* claim) {
     claim->version.data = s->version;
 
@@ -5710,7 +5738,7 @@ void fill_claim(SSL *s, Claim* claim) {
     ClaimCiphers claim_ciphers = { 0 };
     STACK_OF(SSL_CIPHER) * ciphers = SSL_get_ciphers(s);
     int available_ciphers_len = sk_SSL_CIPHER_num(ciphers);
-    claim_ciphers.len = available_ciphers_len;
+    claim_ciphers.length = available_ciphers_len;
     for (int j = 0; j < available_ciphers_len; ++j) {
         const SSL_CIPHER *c = sk_SSL_CIPHER_value(ciphers, j);
         if (j < CLAIM_MAX_AVAILABLE_CIPHERS) {
@@ -5720,18 +5748,28 @@ void fill_claim(SSL *s, Claim* claim) {
     claim->available_ciphers = claim_ciphers;
 
     // cert
-    const EVP_PKEY* cert_key = X509_get_pubkey(SSL_get_certificate(s));
-    if (cert_key != NULL) {
-        claim->cert.key_type = match_key_type(cert_key);
-        claim->cert.key_length = EVP_PKEY_bits(cert_key);
-        /*specific for RSA: RSA_bits(EVP_PKEY_get0_RSA(cert_key));*/
+    const X509 *cert = SSL_get_certificate(s);
+    if (cert != NULL) {
+        const EVP_PKEY* cert_pkey = X509_get0_pubkey(cert);
+        if (cert_pkey != NULL) {
+            claim->cert.key_type = match_key_type(cert_pkey);
+            claim->cert.key_length = EVP_PKEY_bits(cert_pkey);
+            /*specific for RSA: RSA_bits(EVP_PKEY_get0_RSA(cert_key));*/
+        }
+
+        // no need to free "cert", only peer_cert needs to be cleared
     }
 
     // peer cert
-    const EVP_PKEY* peer_cert_key = X509_get_pubkey(SSL_get_peer_certificate(s));
-    if (peer_cert_key != NULL) {
-        claim->peer_cert.key_type = match_key_type(peer_cert_key);
-        claim->peer_cert.key_length = EVP_PKEY_bits(peer_cert_key);
+    const X509 *peer_cert = SSL_get_peer_certificate(s);
+    if (peer_cert != NULL) {
+        const EVP_PKEY* peer_cert_pkey = X509_get0_pubkey(peer_cert);
+        if (peer_cert_pkey != NULL) {
+            claim->peer_cert.key_type = match_key_type(peer_cert_pkey);
+            claim->peer_cert.key_length = EVP_PKEY_bits(peer_cert_pkey);
+        }
+
+        X509_free(peer_cert);
     }
 
     // tls 1.3 secrets
@@ -5793,6 +5831,7 @@ void fill_claim(SSL *s, Claim* claim) {
     // transcript
     if (s->s3->handshake_dgst != 0) {
         size_t hashlen = 0;
-        ssl_handshake_hash(s, claim->transcript.data, EVP_MAX_MD_SIZE, &hashlen);
+        create_handshake_hash(s, claim->transcript.data, EVP_MAX_MD_SIZE, &hashlen);
+        claim->transcript.length = hashlen;
     }
 }
