@@ -636,7 +636,7 @@ static SUB_STATE_RETURN read_state_machine(SSL *s)
             ret = process_message(s, &pkt);
 
             if (ret != MSG_PROCESS_ERROR) {
-                Claim claim = {0};
+                Claim claim = {-1};
 
                 claim.write = 0;
 
@@ -926,7 +926,7 @@ static SUB_STATE_RETURN write_state_machine(SSL *s)
                 return SUB_STATE_ERROR;
             }
 
-            Claim claim = { 0 };
+            Claim claim = { -1 };
 
             claim.write = 1;
 

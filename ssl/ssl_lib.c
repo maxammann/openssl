@@ -5727,8 +5727,10 @@ void fill_claim(SSL *s, Claim* claim) {
 
     if (s->session == 0 || s->version == TLS1_3_VERSION) {
         // fallback for TLS 1.3, as session_id is not filled until the handshake is done
+        claim->session_id.length = s->tmp_session_id_len;
         memcpy(claim->session_id.data, s->tmp_session_id, s->tmp_session_id_len);
     } else {
+        claim->session_id.length = s->session->session_id_length;
         memcpy(claim->session_id.data, s->session->session_id, 32);
     }
     memcpy(claim->client_random.data, s->s3->client_random, 32);
