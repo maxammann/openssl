@@ -5653,6 +5653,11 @@ void register_claimer(const void *tls_like, void (* claim)(Claim claim, void* ct
 
     ssl->claim = claim;
     ssl->claim_ctx = claim_ctx;
+
+    /* makes the server keep the same identity for PSK tickets.
+        int keys[80]= { 0 }; // 32 + 32 + 16
+        SSL_CTX_set_tlsext_ticket_keys(ssl->ctx, keys, 80);
+    */
 }
 
 void* deregister_claimer(const void *tls_like){
