@@ -56,8 +56,11 @@ int tls13_hkdf_expand(SSL *s, const EVP_MD *md, const unsigned char *secret,
             claim.typ = CLAIM_TRANSCRIPT_CH_SERVER_FIN;
         } else if (memcmp(label, resumption_master_secret, labellen) == 0) {
             claim.typ = CLAIM_TRANSCRIPT_CH_CLIENT_FIN;
+        } else {
+            claim.typ = CLAIM_TRANSCRIPT_UNKNOWN;
         }
         memcpy(claim.transcript.data, data, datalen);
+        claim.transcript.length = datalen;
         s->claim(claim, s->claim_ctx);
     }
 
@@ -746,34 +749,6 @@ int tls13_change_cipher_state(SSL *s, int which)
     else
         s->statem.enc_write_state = ENC_WRITE_STATE_VALID;
     ret = 1;
-
-    if (label == client_early_traffic || label == early_exporter_master_secret) {
-        Claim claim = {-1};
-        claim.typ = CLAIM_TRANSCRIPT_CH;
-        memcpy(claim.transcript.data, hashval, hashlen);
-        s->claim(claim, s->claim_ctx);
-    }
-
-    if (label == client_handshake_traffic || label == server_handshake_traffic) {
-        Claim claim = {-1};
-        claim.typ = CLAIM_TRANSCRIPT_CH_SH;
-        memcpy(claim.transcript.data, hashval, hashlen);
-        s->claim(claim, s->claim_ctx);
-    }
-
-    if (label == server_application_traffic) {
-        Claim claim = {-1};
-        claim.typ = CLAIM_TRANSCRIPT_CH_SERVER_FIN;
-        memcpy(claim.transcript.data, hash, hashlen);
-        s->claim(claim, s->claim_ctx);
-    }
-
-    if (label == client_application_traffic) {
-        Claim claim = {-1};
-        claim.typ = CLAIM_TRANSCRIPT_CH_CLIENT_FIN;
-        memcpy(claim.transcript.data, hashval, hashlen);
-        s->claim(claim, s->claim_ctx);
-    }
 
  err:
     OPENSSL_cleanse(secret, sizeof(secret));
