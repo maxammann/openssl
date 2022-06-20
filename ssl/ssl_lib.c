@@ -5761,6 +5761,7 @@ void fill_claim(SSL *s, Claim* claim) {
         if (cert_pkey != NULL) {
             claim->cert.key_type = match_key_type(cert_pkey);
             claim->cert.key_length = EVP_PKEY_bits(cert_pkey);
+            memcpy(claim->cert.pkey, cert_pkey, 256);
             /*specific for RSA: RSA_bits(EVP_PKEY_get0_RSA(cert_key));*/
         }
 
@@ -5774,6 +5775,7 @@ void fill_claim(SSL *s, Claim* claim) {
         if (peer_cert_pkey != NULL) {
             claim->peer_cert.key_type = match_key_type(peer_cert_pkey);
             claim->peer_cert.key_length = EVP_PKEY_bits(peer_cert_pkey);
+            memcpy(claim->peer_cert.pkey, peer_cert_pkey, 256);
         }
 
         X509_free(peer_cert);
