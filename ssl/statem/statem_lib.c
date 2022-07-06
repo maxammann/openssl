@@ -210,7 +210,7 @@ static int get_cert_verify_tbs_data(SSL *s, unsigned char *tls13tbs,
         }
 
         *hdata = tls13tbs;
-        *hdatalen = TLS13_TBS_PREAMBLE_SIZE + 0;
+        *hdatalen = TLS13_TBS_PREAMBLE_SIZE + hashlen;
     } else {
         size_t retlen;
         long retlen_l;
