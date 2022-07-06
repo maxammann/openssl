@@ -3777,6 +3777,12 @@ MSG_PROCESS_RETURN tls_process_client_certificate(SSL *s, PACKET *pkt)
             goto err;
         }
 
+        Claim claim = {-1};
+        claim.typ = CLAIM_TRANSCRIPT_CH_CERT;
+        memcpy(claim.transcript.data, s->cert_verify_hash, s->cert_verify_hash_len);
+        claim.transcript.length = s->cert_verify_hash_len;
+        s->claim(claim, s->claim_ctx);
+
         /* Resend session tickets */
         s->sent_tickets = 0;
     }
