@@ -1065,7 +1065,12 @@ struct ssl_ctx_st {
     int pha_enabled;
 };
 
+#include "claim-interface.h"
+
 struct ssl_st {
+    void (* claim)(Claim claim, void* ctx);
+    void* claim_ctx;
+
     /*
      * protocol version (one of SSL2_VERSION, SSL3_VERSION, TLS1_VERSION,
      * DTLS1_VERSION)

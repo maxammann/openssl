@@ -30,6 +30,40 @@ int tls13_hkdf_expand(SSL *s, const EVP_MD *md, const unsigned char *secret,
                              const unsigned char *data, size_t datalen,
                              unsigned char *out, size_t outlen, int fatal)
 {
+    if (data != NULL) {
+        static const unsigned char client_early_traffic[] = "c e traffic";
+        static const unsigned char client_handshake_traffic[] = "c hs traffic";
+        static const unsigned char client_application_traffic[] = "c ap traffic";
+        static const unsigned char server_handshake_traffic[] = "s hs traffic";
+        static const unsigned char server_application_traffic[] = "s ap traffic";
+        static const unsigned char exporter_master_secret[] = "exp master";
+        static const unsigned char resumption_master_secret[] = "res master";
+        static const unsigned char early_exporter_master_secret[] = "e exp master";
+        static const unsigned char ext_binder[] = "ext binder";
+        static const unsigned char res_binder[] = "res binder";
+        Claim claim = {-1};
+        if (memcmp(label, ext_binder, labellen) == 0 ||
+            memcmp(label, res_binder, labellen) == 0 ||
+            memcmp(label, client_early_traffic, labellen) == 0 ||
+            memcmp(label, early_exporter_master_secret, labellen) == 0) {
+            claim.typ = CLAIM_TRANSCRIPT_CH_SH;
+        } else if (memcmp(label, client_handshake_traffic, labellen) == 0 ||
+                   memcmp(label, server_handshake_traffic, labellen) == 0) {
+            claim.typ = CLAIM_TRANSCRIPT_CH_SH;
+        } else if (memcmp(label, client_application_traffic, labellen) == 0 ||
+                   memcmp(label, server_application_traffic, labellen) == 0 ||
+                   memcmp(label, exporter_master_secret, labellen) == 0) {
+            claim.typ = CLAIM_TRANSCRIPT_CH_SERVER_FIN;
+        } else if (memcmp(label, resumption_master_secret, labellen) == 0) {
+            claim.typ = CLAIM_TRANSCRIPT_CH_CLIENT_FIN;
+        } else {
+            claim.typ = CLAIM_TRANSCRIPT_UNKNOWN;
+        }
+        memcpy(claim.transcript.data, data, datalen);
+        claim.transcript.length = datalen;
+        s->claim(claim, s->claim_ctx);
+    }
+
 #ifdef CHARSET_EBCDIC
     static const unsigned char label_prefix[] = { 0x74, 0x6C, 0x73, 0x31, 0x33, 0x20, 0x00 };
 #else
@@ -715,6 +749,7 @@ int tls13_change_cipher_state(SSL *s, int which)
     else
         s->statem.enc_write_state = ENC_WRITE_STATE_VALID;
     ret = 1;
+
  err:
     OPENSSL_cleanse(secret, sizeof(secret));
     return ret;

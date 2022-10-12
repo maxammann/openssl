@@ -635,6 +635,86 @@ static SUB_STATE_RETURN read_state_machine(SSL *s)
             }
             ret = process_message(s, &pkt);
 
+            if (ret != MSG_PROCESS_ERROR) {
+                Claim claim = {-1};
+
+                claim.write = 0;
+
+                switch (st->hand_state) {
+                    default:
+                        claim.typ = CLAIM_UNKNOWN;
+                        break;
+                        // from statem_clnt.c
+                    case TLS_ST_CR_SRVR_HELLO:
+                        claim.typ = CLAIM_SERVER_HELLO;
+                        break;
+                    case TLS_ST_CR_CERT:
+                        claim.typ = CLAIM_CERTIFICATE;
+                        break;
+                    case TLS_ST_CR_CERT_VRFY:
+                        claim.typ = CLAIM_CERTIFICATE_VERIFY;
+                        break;
+                    case TLS_ST_CR_CERT_STATUS:
+                        claim.typ = CLAIM_CERTIFICATE_STATUS;
+                        break;
+                    case TLS_ST_CR_KEY_EXCH:
+                        claim.typ = CLAIM_KEY_EXCHANGE;
+                        break;
+                    case TLS_ST_CR_CERT_REQ:
+                        claim.typ = CLAIM_CERTIFICATE_REQUEST;
+                        break;
+                    case TLS_ST_CR_SRVR_DONE:
+                        claim.typ = CLAIM_SERVER_DONE;
+                        break;
+                    case TLS_ST_CR_CHANGE:
+                        claim.typ = CLAIM_CCS;
+                        break;
+                    case TLS_ST_CR_SESSION_TICKET:
+                        claim.typ = CLAIM_SESSION_TICKET;
+                        break;
+                    case TLS_ST_CR_FINISHED:
+                        claim.typ = CLAIM_FINISHED;
+                        break;
+                    case TLS_ST_CR_HELLO_REQ:
+                        claim.typ = CLAIM_HELLO_REQUEST;
+                        break;
+                    case TLS_ST_CR_ENCRYPTED_EXTENSIONS:
+                        claim.typ = CLAIM_ENCRYPTED_EXTENSIONS;
+                        break;
+                    case TLS_ST_CR_KEY_UPDATE:
+                        claim.typ = CLAIM_KEY_UPDATE;
+                        break;
+                        // from statem_srvr.c
+                    case TLS_ST_SR_CLNT_HELLO:
+                        claim.typ = CLAIM_CLIENT_HELLO;
+                        break;
+                    case TLS_ST_SR_END_OF_EARLY_DATA:
+                        claim.typ = CLAIM_END_OF_EARLY_DATA;
+                        break;
+                    case TLS_ST_SR_CERT:
+                        claim.typ = CLAIM_CERTIFICATE;
+                        break;
+                    case TLS_ST_SR_KEY_EXCH:
+                        claim.typ = CLAIM_KEY_EXCHANGE;
+                        break;
+                    case TLS_ST_SR_CERT_VRFY:
+                        claim.typ = CLAIM_CERTIFICATE_VERIFY;
+                        break;
+                    case TLS_ST_SR_CHANGE:
+                        claim.typ = CLAIM_CCS;
+                        break;
+                    case TLS_ST_SR_FINISHED:
+                        claim.typ = CLAIM_FINISHED;
+                        break;
+                    case TLS_ST_SR_KEY_UPDATE:
+                        claim.typ = CLAIM_KEY_UPDATE;
+                        break;
+                }
+
+                fill_claim(s, &claim);
+                s->claim(claim, s->claim_ctx);
+            }
+
             /* Discard the packet data */
             s->init_num = 0;
 
@@ -845,6 +925,88 @@ static SUB_STATE_RETURN write_state_machine(SSL *s)
                 check_fatal(s, SSL_F_WRITE_STATE_MACHINE);
                 return SUB_STATE_ERROR;
             }
+
+            Claim claim = { -1 };
+
+            claim.write = 1;
+
+            switch (st->hand_state) {
+                default:
+                    claim.typ = CLAIM_UNKNOWN;
+                    break;
+                // from statem_clnt.c
+                case TLS_ST_CW_CHANGE:
+                    claim.typ = CLAIM_CCS;
+                    break;
+                case TLS_ST_CW_CLNT_HELLO:
+                    claim.typ = CLAIM_CLIENT_HELLO;
+                    break;
+                case TLS_ST_CW_END_OF_EARLY_DATA:
+                    claim.typ = CLAIM_END_OF_EARLY_DATA;
+                    break;
+                case TLS_ST_CW_CERT:
+                    claim.typ = CLAIM_CERTIFICATE;
+                    break;
+                case TLS_ST_CW_KEY_EXCH:
+                    claim.typ = CLAIM_KEY_EXCHANGE;
+                    break;
+                case TLS_ST_CW_CERT_VRFY:
+                    claim.typ = CLAIM_CERTIFICATE_VERIFY;
+                    break;
+                case TLS_ST_CW_FINISHED:
+                    claim.typ = CLAIM_FINISHED;
+                    break;
+                case TLS_ST_CW_KEY_UPDATE:
+                    claim.typ = CLAIM_KEY_UPDATE;
+                    break;
+                // from statem_srv.c
+                case TLS_ST_SW_CHANGE:
+                    claim.typ = CLAIM_CCS;
+                    break;
+                case TLS_ST_SW_HELLO_REQ:
+                    claim.typ = CLAIM_HELLO_REQUEST;
+                    break;
+                case TLS_ST_SW_SRVR_HELLO:
+                    claim.typ = CLAIM_SERVER_HELLO;
+                    break;
+                case TLS_ST_SW_CERT:
+                    claim.typ = CLAIM_CERTIFICATE;
+                    break;
+                case TLS_ST_SW_CERT_VRFY:
+                    claim.typ = CLAIM_CERTIFICATE_VERIFY;
+                    break;
+                case TLS_ST_SW_KEY_EXCH:
+                    claim.typ = CLAIM_KEY_EXCHANGE;
+                    break;
+                case TLS_ST_SW_CERT_REQ:
+                    claim.typ = CLAIM_CERTIFICATE_REQUEST;
+                    break;
+                case TLS_ST_SW_SRVR_DONE:
+                    claim.typ = CLAIM_SERVER_DONE;
+                    break;
+                case TLS_ST_SW_SESSION_TICKET:
+                    claim.typ = CLAIM_SESSION_TICKET;
+                    break;
+                case TLS_ST_SW_CERT_STATUS:
+                    claim.typ = CLAIM_CERTIFICATE_STATUS;
+                    break;
+                case TLS_ST_SW_FINISHED:
+                    claim.typ = CLAIM_FINISHED;
+                    break;
+                case TLS_ST_EARLY_DATA:
+                    claim.typ = CLAIM_EARLY_DATA;
+                    break;
+                case TLS_ST_SW_ENCRYPTED_EXTENSIONS:
+                    claim.typ = CLAIM_ENCRYPTED_EXTENSIONS;
+                    break;
+                case TLS_ST_SW_KEY_UPDATE:
+                    claim.typ = CLAIM_KEY_UPDATE;
+                    break;
+            }
+
+            fill_claim(s, &claim);
+            s->claim(claim, s->claim_ctx);
+
             if (!ssl_close_construct_packet(s, &pkt, mt)
                     || !WPACKET_finish(&pkt)) {
                 WPACKET_cleanup(&pkt);
