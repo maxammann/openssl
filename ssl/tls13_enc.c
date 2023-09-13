@@ -21,6 +21,8 @@
 /* ASCII: "tls13 ", in hex for EBCDIC compatibility */
 static const unsigned char label_prefix[] = "\x74\x6C\x73\x31\x33\x20";
 
+#define ossl_min(a, b) ((a) < (b)) ? (a) : (b)
+
 /*
  * Given a |secret|; a |label| of length |labellen|; and |data| of length
  * |datalen| (e.g. typically a hash of the handshake messages), derive a new
@@ -45,19 +47,19 @@ int tls13_hkdf_expand(SSL *s, const EVP_MD *md, const unsigned char *secret,
         static const unsigned char ext_binder[] = "ext binder";
         static const unsigned char res_binder[] = "res binder";
         Claim claim = {-1};
-        if (memcmp(label, ext_binder, labellen) == 0 ||
-            memcmp(label, res_binder, labellen) == 0 ||
-            memcmp(label, client_early_traffic, labellen) == 0 ||
-            memcmp(label, early_exporter_master_secret, labellen) == 0) {
+        if (memcmp(label, ext_binder, ossl_min(sizeof(ext_binder), labellen)) == 0 ||
+            memcmp(label, res_binder, ossl_min(sizeof(res_binder), labellen)) == 0 ||
+            memcmp(label, client_early_traffic, ossl_min(sizeof(client_early_traffic), labellen)) == 0 ||
+            memcmp(label, early_exporter_master_secret, ossl_min(sizeof(early_exporter_master_secret), labellen)) == 0) {
             claim.typ = CLAIM_TRANSCRIPT_CH_SH;
-        } else if (memcmp(label, client_handshake_traffic, labellen) == 0 ||
-                   memcmp(label, server_handshake_traffic, labellen) == 0) {
+        } else if (memcmp(label, client_handshake_traffic, ossl_min(sizeof(client_handshake_traffic), labellen)) == 0 ||
+                   memcmp(label, server_handshake_traffic, ossl_min(sizeof(server_handshake_traffic), labellen)) == 0) {
             claim.typ = CLAIM_TRANSCRIPT_CH_SH;
-        } else if (memcmp(label, client_application_traffic, labellen) == 0 ||
-                   memcmp(label, server_application_traffic, labellen) == 0 ||
-                   memcmp(label, exporter_master_secret, labellen) == 0) {
+        } else if (memcmp(label, client_application_traffic, ossl_min(sizeof(client_application_traffic), labellen)) == 0 ||
+                   memcmp(label, server_application_traffic, ossl_min(sizeof(server_application_traffic), labellen)) == 0 ||
+                   memcmp(label, exporter_master_secret, ossl_min(sizeof(exporter_master_secret), labellen)) == 0) {
             claim.typ = CLAIM_TRANSCRIPT_CH_SERVER_FIN;
-        } else if (memcmp(label, resumption_master_secret, labellen) == 0) {
+        } else if (memcmp(label, resumption_master_secret, ossl_min(sizeof(resumption_master_secret), labellen)) == 0) {
             claim.typ = CLAIM_TRANSCRIPT_CH_CLIENT_FIN;
         } else {
             claim.typ = CLAIM_TRANSCRIPT_UNKNOWN;
