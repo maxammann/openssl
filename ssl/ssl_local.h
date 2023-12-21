@@ -36,6 +36,21 @@
 # include "internal/bio.h"
 # include "internal/ktls.h"
 
+#define FUZZTIME 1485898104
+
+#define TIME_IMPL(t) { if (t != NULL) *t = FUZZTIME; return FUZZTIME; }
+
+/*
+ * This might not work in all cases (and definitely not on Windows
+ * because of the way linkers are) and callees can still get the
+ * current time instead of the fixed time. This will just result
+ * in things not being fully reproducible and have a slightly
+ * different coverage.
+ */
+#if !defined(_WIN32)
+time_t time(time_t *t) TIME_IMPL(t)
+#endif
+
 # ifdef OPENSSL_BUILD_SHLIBSSL
 #  undef OPENSSL_EXTERN
 #  define OPENSSL_EXTERN OPENSSL_EXPORT
