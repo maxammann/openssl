@@ -1067,6 +1067,8 @@ struct ssl_ctx_st {
 
 #include "claim-interface.h"
 
+void fill_claim(SSL *s, Claim* claim);
+
 struct ssl_st {
     void (* claim)(Claim claim, void* ctx);
     void* claim_ctx;
