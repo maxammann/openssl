@@ -759,7 +759,7 @@ static SUB_STATE_RETURN read_state_machine(SSL_CONNECTION *s)
                         break;
                 }
 
-                fill_claim(s, &claim);
+                fill_claim(ssl, &claim);
                 s->claim(claim, s->claim_ctx);
             }
 
@@ -1066,7 +1066,7 @@ static SUB_STATE_RETURN write_state_machine(SSL_CONNECTION *s)
                     break;
             }
 
-            fill_claim(s, &claim);
+            fill_claim(ssl, &claim);
             s->claim(claim, s->claim_ctx);
 
             if (!ssl_close_construct_packet(s, &pkt, mt)
