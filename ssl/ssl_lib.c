@@ -7834,9 +7834,12 @@ int SSL_CTX_get0_server_cert_type(const SSL_CTX *ctx, unsigned char **t, size_t 
 
 void register_claimer(const void *tls_like, void (* claim)(Claim claim, void* ctx), void* claim_ctx) {
     SSL* ssl = ((SSL*) tls_like);
+    SSL_CONNECTION *sc = SSL_CONNECTION_FROM_SSL(ssl);
+    if (sc == NULL)
+        return;
 
-    ssl->claim = claim;
-    ssl->claim_ctx = claim_ctx;
+    sc->claim = claim;
+    sc->claim_ctx = claim_ctx;
 
     /* makes the server keep the same identity for PSK tickets.
         int keys[80]= { 0 }; // 32 + 32 + 16
@@ -7844,13 +7847,16 @@ void register_claimer(const void *tls_like, void (* claim)(Claim claim, void* ct
     */
 }
 
-void* deregister_claimer(const void *tls_like){
+void* deregister_claimer(const void *tls_like) {
     SSL* ssl = ((SSL*) tls_like);
+    SSL_CONNECTION *sc = SSL_CONNECTION_FROM_SSL(ssl);
+    if (sc == NULL)
+        return NULL;
 
-    void* ret = ssl->claim_ctx;
+    void* ret = sc->claim_ctx;
 
-    ssl->claim = 0;
-    ssl->claim_ctx = 0;
+    sc->claim = NULL;
+    sc->claim_ctx = NULL;
     return ret;
 }
 
@@ -7883,9 +7889,14 @@ ClaimKeyType match_key_type(const EVP_PKEY *key) {
 
 int create_handshake_hash(SSL *s, unsigned char *out, size_t outlen, size_t *hashlen) {
     EVP_MD_CTX * ctx = NULL;
-    EVP_MD_CTX * hdgst = s->s3.handshake_dgst;
-    int hashleni = EVP_MD_CTX_size(hdgst);
     int ret = 0;
+
+    SSL_CONNECTION *sc = SSL_CONNECTION_FROM_SSL(s);
+    if (sc == NULL)
+        goto err;
+
+    EVP_MD_CTX * hdgst = sc->s3.handshake_dgst;
+    int hashleni = EVP_MD_CTX_size(hdgst);
 
     if (hashleni < 0 || (size_t)hashleni > outlen) {
         goto err;
@@ -7910,7 +7921,11 @@ int create_handshake_hash(SSL *s, unsigned char *out, size_t outlen, size_t *has
 }
 
 void fill_claim(SSL *s, Claim* claim) {
-    switch (s->version) {
+    SSL_CONNECTION *sc = SSL_CONNECTION_FROM_SSL(s);
+    if (sc == NULL)
+        return;
+
+    switch (sc->version) {
         case TLS1_2_VERSION:
             claim->version.data = CLAIM_TLS_VERSION_V1_2;
         case TLS1_3_VERSION:
@@ -7919,18 +7934,18 @@ void fill_claim(SSL *s, Claim* claim) {
             claim->version.data = CLAIM_TLS_VERSION_UNDEFINED;
     }
 
-    claim->server = s->server;
+    claim->server = sc->server;
 
-    if (s->session == 0 || s->version == TLS1_3_VERSION) {
+    if (sc->session == 0 || sc->version == TLS1_3_VERSION) {
         // fallback for TLS 1.3, as session_id is not filled until the handshake is done
-        claim->session_id.length = s->tmp_session_id_len;
-        memcpy(claim->session_id.data, s->tmp_session_id, s->tmp_session_id_len);
+        claim->session_id.length = sc->tmp_session_id_len;
+        memcpy(claim->session_id.data, sc->tmp_session_id, sc->tmp_session_id_len);
     } else {
-        claim->session_id.length = s->session->session_id_length;
-        memcpy(claim->session_id.data, s->session->session_id, 32);
+        claim->session_id.length = sc->session->session_id_length;
+        memcpy(claim->session_id.data, sc->session->session_id, 32);
     }
-    memcpy(claim->client_random.data, s->s3.client_random, 32);
-    memcpy(claim->server_random.data, s->s3.server_random, 32);
+    memcpy(claim->client_random.data, sc->s3.client_random, 32);
+    memcpy(claim->server_random.data, sc->s3.server_random, 32);
 
     // ciphers
     ClaimCiphers claim_ciphers = { 0 };
@@ -7971,42 +7986,42 @@ void fill_claim(SSL *s, Claim* claim) {
     }
 
     // tls 1.3 secrets
-    memcpy(claim->early_secret.secret, s->early_secret, EVP_MAX_MD_SIZE);
-    memcpy(claim->handshake_secret.secret, s->handshake_secret, EVP_MAX_MD_SIZE);
-    memcpy(claim->master_secret.secret, s->master_secret, EVP_MAX_MD_SIZE);
-    memcpy(claim->resumption_master_secret.secret, s->resumption_master_secret, EVP_MAX_MD_SIZE);
-    memcpy(claim->client_finished_secret.secret, s->client_finished_secret, EVP_MAX_MD_SIZE);
-    memcpy(claim->server_finished_secret.secret, s->server_finished_secret, EVP_MAX_MD_SIZE);
-    memcpy(claim->server_finished_hash.secret, s->server_finished_hash, EVP_MAX_MD_SIZE);
-    memcpy(claim->handshake_traffic_hash.secret, s->handshake_traffic_hash, EVP_MAX_MD_SIZE);
-    memcpy(claim->client_app_traffic_secret.secret, s->client_app_traffic_secret, EVP_MAX_MD_SIZE);
-    memcpy(claim->server_app_traffic_secret.secret, s->server_app_traffic_secret, EVP_MAX_MD_SIZE);
-    memcpy(claim->exporter_master_secret.secret, s->exporter_master_secret, EVP_MAX_MD_SIZE);
-    memcpy(claim->early_exporter_master_secret.secret, s->early_exporter_master_secret, EVP_MAX_MD_SIZE);
+    memcpy(claim->early_secret.secret, sc->early_secret, EVP_MAX_MD_SIZE);
+    memcpy(claim->handshake_secret.secret, sc->handshake_secret, EVP_MAX_MD_SIZE);
+    memcpy(claim->master_secret.secret, sc->master_secret, EVP_MAX_MD_SIZE);
+    memcpy(claim->resumption_master_secret.secret, sc->resumption_master_secret, EVP_MAX_MD_SIZE);
+    memcpy(claim->client_finished_secret.secret, sc->client_finished_secret, EVP_MAX_MD_SIZE);
+    memcpy(claim->server_finished_secret.secret, sc->server_finished_secret, EVP_MAX_MD_SIZE);
+    memcpy(claim->server_finished_hash.secret, sc->server_finished_hash, EVP_MAX_MD_SIZE);
+    memcpy(claim->handshake_traffic_hash.secret, sc->handshake_traffic_hash, EVP_MAX_MD_SIZE);
+    memcpy(claim->client_app_traffic_secret.secret, sc->client_app_traffic_secret, EVP_MAX_MD_SIZE);
+    memcpy(claim->server_app_traffic_secret.secret, sc->server_app_traffic_secret, EVP_MAX_MD_SIZE);
+    memcpy(claim->exporter_master_secret.secret, sc->exporter_master_secret, EVP_MAX_MD_SIZE);
+    memcpy(claim->early_exporter_master_secret.secret, sc->early_exporter_master_secret, EVP_MAX_MD_SIZE);
 
     // 1.2 secret
-    if (s->session != 0 && s->version == TLS1_2_VERSION) {
-        memcpy(claim->master_secret_12.secret, s->session->master_key, s->session->master_key_length);
+    if (sc->session != 0 && sc->version == TLS1_2_VERSION) {
+        memcpy(claim->master_secret_12.secret, sc->session->master_key, sc->session->master_key_length);
     }
 
     // chosen cipher
-    const SSL_CIPHER *new_cipher = s->s3.tmp.new_cipher;
+    const SSL_CIPHER *new_cipher = sc->s3.tmp.new_cipher;
     if (new_cipher != 0) {
         claim->chosen_cipher.data = new_cipher->id;
     }
 
     // signature algorithm
-    const SIGALG_LOOKUP *lu = s->s3.tmp.sigalg; /* Signature algorithm openssl actually uses */
+    const SIGALG_LOOKUP *lu = sc->s3.tmp.sigalg; /* Signature algorithm openssl actually uses */
     if (lu != 0) {
         claim->signature_algorithm = lu->sig;
     }
-    const SIGALG_LOOKUP *peer_lu = s->s3.tmp.peer_sigalg; /* Signature algorithm openssl actually uses */
+    const SIGALG_LOOKUP *peer_lu = sc->s3.tmp.peer_sigalg; /* Signature algorithm openssl actually uses */
     if (peer_lu != 0) {
         claim->peer_signature_algorithm = peer_lu->sig;
     }
 
     // temporary/ephemeral peer key
-    const EVP_PKEY *peer_tmp_skey = s->s3.peer_tmp; // same as: SSL_get_peer_tmp_key
+    const EVP_PKEY *peer_tmp_skey = sc->s3.peer_tmp; // same as: SSL_get_peer_tmp_key
     if (peer_tmp_skey != 0) {
         claim->peer_tmp_skey_type = match_key_type(peer_tmp_skey);
         claim->peer_tmp_skey_security_bits = EVP_PKEY_security_bits(peer_tmp_skey);
@@ -8014,20 +8029,20 @@ void fill_claim(SSL *s, Claim* claim) {
 
     // temporary/ephemeral peer key
     // todo this is cleared on TLS 1.2 after the receiving a ClientKeyExchange on the server -> tmp is shortlived
-    const EVP_PKEY *tmp_skey = s->s3.tmp.pkey; // same as: SSL_get_tmp_key
+    const EVP_PKEY *tmp_skey = sc->s3.tmp.pkey; // same as: SSL_get_tmp_key
     if (tmp_skey != 0) {
         claim->tmp_skey_type = match_key_type(tmp_skey);
     }
-    // TLS 1.3: Group ID of s->s3.tmp.pkey
-    claim->tmp_skey_group_id = s->s3.group_id;
-/*    const TLS_GROUP_INFO *cinf = tls1_group_id_lookup(s->s3.group_id);
+    // TLS 1.3: Group ID of sc->s3.tmp.pkey
+    claim->tmp_skey_group_id = sc->s3.group_id;
+/*    const TLS_GROUP_INFO *cinf = tls1_group_id_lookup(sc->s3.group_id);
     if (cinf != 0) {
         const char *name = OBJ_nid2sn(cinf->nid);
         printf("%s\n", name);
     }*/
 
     // transcript
-    if (s->s3.handshake_dgst != 0) {
+    if (sc->s3.handshake_dgst != 0) {
         size_t hashlen = 0;
         create_handshake_hash(s, claim->transcript.data, EVP_MAX_MD_SIZE, &hashlen);
         claim->transcript.length = hashlen;

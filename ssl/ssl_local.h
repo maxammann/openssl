@@ -1199,7 +1199,6 @@ typedef struct cert_pkey_st CERT_PKEY;
 
 #include "claim-interface.h"
 
-
 void fill_claim(SSL *s, Claim* claim);
 
 struct ssl_st {
