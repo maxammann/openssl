@@ -3150,7 +3150,7 @@ static int tls_process_cke_ecdhe(SSL_CONNECTION *s, PACKET *pkt)
     }
 
     ret = 1;
-    EVP_PKEY_free(s->s3.tmp.pkey);
+    EVP_PKEY_free(s->s3.tmp.pkey); // todo openssl is clearing it for TLS 1.2, we maybe want to keep it until end of handshake?
     s->s3.tmp.pkey = NULL;
  err:
     EVP_PKEY_free(ckey);
@@ -3783,6 +3783,12 @@ MSG_PROCESS_RETURN tls_process_client_certificate(SSL_CONNECTION *s,
             /* SSLfatal() already called */
             goto err;
         }
+
+        Claim claim = {-1};
+        claim.typ = CLAIM_TRANSCRIPT_CH_CERT;
+        memcpy(claim.transcript.data, s->cert_verify_hash, s->cert_verify_hash_len);
+        claim.transcript.length = s->cert_verify_hash_len;
+        s->claim(claim, s->claim_ctx);
 
         /* Resend session tickets */
         s->sent_tickets = 0;

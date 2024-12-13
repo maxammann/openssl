@@ -1196,6 +1196,10 @@ typedef struct cert_pkey_st CERT_PKEY;
 #define SSL_TYPE_QUIC_CONNECTION 1
 #define SSL_TYPE_QUIC_XSO        2
 
+#include "claim-interface.h"
+
+void fill_claim(SSL *s, Claim* claim);
+
 struct ssl_st {
     int type;
     SSL_CTX *ctx;
@@ -1210,6 +1214,8 @@ struct ssl_st {
 struct ssl_connection_st {
     /* type identifier and common data */
     struct ssl_st ssl;
+    void (* claim)(Claim claim, void* ctx);
+    void* claim_ctx;
 
     /*
      * The actual end user's SSL object. Could be different to this one for
